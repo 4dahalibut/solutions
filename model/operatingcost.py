@@ -68,7 +68,7 @@ class OperatingCost:
         """Total operating cost per year.
            SolarPVUtil 'Operating Cost'!D19:D64
         """
-        result = self.soln_pds_annual_breakout().sum(axis=1)
+        result = self._soln_pds_annual_breakout().sum(axis=1)
         result.name = 'soln_pds_annual_operating_cost'
         return result
 
@@ -88,7 +88,7 @@ class OperatingCost:
         """Total operating cost per year.
            SolarPVUtil 'Operating Cost'!K19:K64
         """
-        result = self.conv_ref_annual_breakout_core().sum(axis=1)
+        result = self._conv_ref_annual_breakout_core().sum(axis=1)
         result.name = 'conv_ref_annual_operating_cost'
         return result
 
@@ -114,7 +114,7 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_pds_new_funits_per_year(self):
+    def _soln_pds_new_funits_per_year(self):
         """New functional units required each year.
            SolarPVUtil 'Operating Cost'!F19:F64
         """
@@ -125,7 +125,7 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_pds_net_annual_iunits_reqd(self):
+    def _soln_pds_net_annual_iunits_reqd(self):
         """Total implementation units required each year.
            SolarPVUtil 'Operating Cost'!I531:I576
         """
@@ -135,18 +135,18 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_pds_new_annual_iunits_reqd(self):
+    def _soln_pds_new_annual_iunits_reqd(self):
         """New implementation units required each year.
            SolarPVUtil 'Operating Cost'!K531:K576
         """
-        delta = self.soln_pds_net_annual_iunits_reqd().diff()
-        delta.iloc[0] = self.soln_pds_net_annual_iunits_reqd().iloc[0]  # iloc[0] is NA after diff()
+        delta = self._soln_pds_net_annual_iunits_reqd().diff()
+        delta.iloc[0] = self._soln_pds_net_annual_iunits_reqd().iloc[0]  # iloc[0] is NA after diff()
         delta.name = 'soln_pds_new_annual_iunits_reqd'
         return delta
 
 
     @lru_cache()
-    def soln_pds_annual_breakout(self):
+    def _soln_pds_annual_breakout(self):
         """Operating costs broken out per year for Solution-PDS
            This table calculates the contribution of each new set of SOLUTION
            implementation units installed over the lifetime of the units, but only
@@ -155,8 +155,8 @@ class OperatingCost:
            SolarPVUtil 'Operating Cost'!B262:AV386
         """
         result = self._annual_breakout(
-            new_funits_per_year=self.soln_pds_new_funits_per_year().loc[:, 'World'],
-            new_annual_iunits_reqd=self.soln_pds_new_annual_iunits_reqd().loc[:, 'World'],
+            new_funits_per_year=self._soln_pds_new_funits_per_year().loc[:, 'World'],
+            new_annual_iunits_reqd=self._soln_pds_new_annual_iunits_reqd().loc[:, 'World'],
             lifetime_replacement=self.ac.soln_lifetime_replacement,
             var_oper_cost_per_funit=self.ac.soln_var_oper_cost_per_funit,
             fuel_cost_per_funit=self.ac.soln_fuel_cost_per_funit,
@@ -166,13 +166,13 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_pds_annual_breakout_core(self):
+    def _soln_pds_annual_breakout_core(self):
         """Returns soln_pds_annual_breakout for CORE_START_YEAR:CORE_END_YEAR"""
-        return self.soln_pds_annual_breakout().loc[dd.CORE_START_YEAR:dd.CORE_END_YEAR]
+        return self._soln_pds_annual_breakout().loc[dd.CORE_START_YEAR:dd.CORE_END_YEAR]
 
 
     @lru_cache()
-    def conv_ref_new_annual_iunits_reqd(self):
+    def _conv_ref_new_annual_iunits_reqd(self):
         """New implementation units required each year.
            SolarPVUtil 'Operating Cost'!L531:L576
         """
@@ -181,9 +181,8 @@ class OperatingCost:
         delta.name = 'conv_ref_new_annual_iunits_reqd'
         return delta
 
-
     @lru_cache()
-    def conv_ref_annual_breakout(self):
+    def _conv_ref_annual_breakout(self):
         """Operating costs broken out per year for Conventional-REF
            This table calculates the contribution of each new set of CONVENTIONAL
            implementation units installed over the lifetime of the units, but only
@@ -192,8 +191,8 @@ class OperatingCost:
            SolarPVUtil 'Operating Cost'!B399:AV523
         """
         result = self._annual_breakout(
-            new_funits_per_year=self.soln_pds_new_funits_per_year().loc[:, 'World'],
-            new_annual_iunits_reqd=self.conv_ref_new_annual_iunits_reqd().loc[:, 'World'],
+            new_funits_per_year=self._soln_pds_new_funits_per_year().loc[:, 'World'],
+            new_annual_iunits_reqd=self._conv_ref_new_annual_iunits_reqd().loc[:, 'World'],
             lifetime_replacement=self.ac.soln_lifetime_replacement,
             var_oper_cost_per_funit=self.ac.conv_var_oper_cost_per_funit,
             fuel_cost_per_funit=self.ac.conv_fuel_cost_per_funit,
@@ -201,12 +200,10 @@ class OperatingCost:
         result.name = 'conv_ref_annual_breakout'
         return result
 
-
     @lru_cache()
-    def conv_ref_annual_breakout_core(self):
+    def _conv_ref_annual_breakout_core(self):
         """Returns conv_ref_annual_breakout for CORE_START_YEAR:CORE_END_YEAR"""
-        return self.conv_ref_annual_breakout().loc[dd.CORE_START_YEAR:dd.CORE_END_YEAR]
-
+        return self._conv_ref_annual_breakout().loc[dd.CORE_START_YEAR:dd.CORE_END_YEAR]
 
     def _annual_breakout(self, new_funits_per_year, new_annual_iunits_reqd,
                          lifetime_replacement, var_oper_cost_per_funit, fuel_cost_per_funit,
@@ -254,7 +251,7 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_marginal_first_cost(self):
+    def _soln_marginal_first_cost(self):
         """Marginal First Cost.
            SolarPVUtil 'Operating Cost'!B126:B250
         """
@@ -273,8 +270,8 @@ class OperatingCost:
         """Marginal First Cost.
            SolarPVUtil 'Operating Cost'!C126:C250
         """
-        conv_ref_lifetime_cost = self.conv_ref_annual_breakout().sum(axis=1)
-        soln_pds_lifetime_cost = self.soln_pds_annual_breakout().sum(axis=1)
+        conv_ref_lifetime_cost = self._conv_ref_annual_breakout().sum(axis=1)
+        soln_pds_lifetime_cost = self._soln_pds_annual_breakout().sum(axis=1)
         result = conv_ref_lifetime_cost - soln_pds_lifetime_cost
         index = pd.RangeIndex(result.first_valid_index(), 2140)
         result = result.reindex(index)
@@ -283,11 +280,11 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_net_cash_flow(self):
+    def _soln_net_cash_flow(self):
         """Marginal First Cost.
            SolarPVUtil 'Operating Cost'!D126:D250
         """
-        result = self.soln_marginal_first_cost() + self.soln_marginal_operating_cost_savings()
+        result = self._soln_marginal_first_cost() + self.soln_marginal_operating_cost_savings()
         index = pd.RangeIndex(result.first_valid_index(), 2140)
         result = result.reindex(index)
         result.name = 'soln_net_cash_flow'
@@ -300,7 +297,7 @@ class OperatingCost:
            SolarPVUtil 'Operating Cost'!E126:E250
         """
         npv = []
-        net_cash_flow = self.soln_net_cash_flow()
+        net_cash_flow = self._soln_net_cash_flow()
         for n in range(len(net_cash_flow.index)):
             l = [0] * (n + 1) + [net_cash_flow.iloc[n]]
             npv.append(numpy_financial.npv(rate=self.ac.npv_discount_rate, values=l))
@@ -310,7 +307,7 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_vs_conv_single_iunit_cashflow(self):
+    def _soln_vs_conv_single_iunit_cashflow(self):
         """Estimate the cash flows for a single solution implementation unit while matching
            the output of that unit (in functional units) with the equivalent output of a
            conventional implementation unit. This takes into account:
@@ -377,12 +374,12 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_vs_conv_single_iunit_npv(self):
+    def _soln_vs_conv_single_iunit_npv(self):
         """Net Present Value of single iunit cashflow.
            SolarPVUtil 'Operating Cost'!J126:J250
         """
         npv = []
-        svcsic = self.soln_vs_conv_single_iunit_cashflow()
+        svcsic = self._soln_vs_conv_single_iunit_cashflow()
         offset = self.single_iunit_purchase_year - svcsic.first_valid_index() + 1
         for n in range(len(svcsic.index)):
             l = [0] * (n + offset) + [svcsic.iloc[n]]
@@ -394,29 +391,29 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_vs_conv_single_iunit_payback(self):
+    def _soln_vs_conv_single_iunit_payback(self):
         """Whether the solution has paid off versus the conventional, for each year.
            SolarPVUtil 'Operating Cost'!K126:K250
         """
-        result = self.soln_vs_conv_single_iunit_cashflow().cumsum().apply(lambda x: 1 if x >= 0 else 0)
+        result = self._soln_vs_conv_single_iunit_cashflow().cumsum().apply(lambda x: 1 if x >= 0 else 0)
         result.name = 'soln_vs_conv_single_iunit_payback'
         return result
 
 
 
     @lru_cache()
-    def soln_vs_conv_single_iunit_payback_discounted(self):
+    def _soln_vs_conv_single_iunit_payback_discounted(self):
         """Whether the solution NPV has paid off versus the conventional, for each year.
            SolarPVUtil 'Operating Cost'!L126:L250
         """
-        result = self.soln_vs_conv_single_iunit_npv().cumsum().apply(lambda x: 1 if x >= 0 else 0)
+        result = self._soln_vs_conv_single_iunit_npv().cumsum().apply(lambda x: 1 if x >= 0 else 0)
         result.name = 'soln_vs_conv_single_iunit_payback_discounted'
         return result
 
 
 
     @lru_cache()
-    def soln_only_single_iunit_cashflow(self):
+    def _soln_only_single_iunit_cashflow(self):
         """
            SolarPVUtil 'Operating Cost'!M126:M250
         """
@@ -465,12 +462,12 @@ class OperatingCost:
 
 
     @lru_cache()
-    def soln_only_single_iunit_npv(self):
+    def _soln_only_single_iunit_npv(self):
         """Net Present Value of single iunit cashflow, looking only at costs of the Solution.
            SolarPVUtil 'Operating Cost'!N126:N250
         """
         npv = []
-        sosic = self.soln_only_single_iunit_cashflow()
+        sosic = self._soln_only_single_iunit_cashflow()
         offset = self.single_iunit_purchase_year - sosic.first_valid_index() + 1
         for n in range(len(sosic.index)):
             l = [0] * (n + offset) + [sosic.iloc[n]]
@@ -486,7 +483,7 @@ class OperatingCost:
         """Whether the solution has paid off, for each year.
            SolarPVUtil 'Operating Cost'!O126:O250
         """
-        result = self.soln_only_single_iunit_cashflow().cumsum().apply(lambda x: 1 if x >= 0 else 0)
+        result = self._soln_only_single_iunit_cashflow().cumsum().apply(lambda x: 1 if x >= 0 else 0)
         result.name = 'soln_only_single_iunit_payback'
         return result
 
@@ -497,6 +494,6 @@ class OperatingCost:
         """Whether the solution NPV has paid off, for each year.
            SolarPVUtil 'Operating Cost'!P126:P250
         """
-        result = self.soln_only_single_iunit_npv().cumsum().apply(lambda x: 1 if x >= 0 else 0)
+        result = self._soln_only_single_iunit_npv().cumsum().apply(lambda x: 1 if x >= 0 else 0)
         result.name = 'soln_only_single_iunit_payback_discounted'
         return result

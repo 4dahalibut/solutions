@@ -893,17 +893,17 @@ def verify_operating_cost(obj, verify):
     #
     # We mask off all cells where the value is less than one cent. We assert that being off by
     # a penny at  the end of the equipment lifetime is acceptable.
-    s = obj.oc.soln_pds_annual_breakout().reset_index()
+    s = obj.oc._soln_pds_annual_breakout().reset_index()
     soln_breakout_mask = s.mask(
         s < 0.01, other=True).where(s < 0.01, other=False)
-    s = obj.oc.conv_ref_annual_breakout().reset_index()
+    s = obj.oc._conv_ref_annual_breakout().reset_index()
     conv_breakout_mask = s.mask(
         s < 0.01, other=True).where(s < 0.01, other=False)
 
     verify['Operating Cost'] = [
-            ('B262:AV386', obj.oc.soln_pds_annual_breakout(
+            ('B262:AV386', obj.oc._soln_pds_annual_breakout(
             ).reset_index(), soln_breakout_mask),
-            ('B399:AV523', obj.oc.conv_ref_annual_breakout(
+            ('B399:AV523', obj.oc._conv_ref_annual_breakout(
             ).reset_index(), conv_breakout_mask),
             # ('B19:B64', Not implemented
             # ('C19:C64', checked by 'Unit Adoption Calculations'!C253
@@ -911,7 +911,7 @@ def verify_operating_cost(obj, verify):
             ).loc[2015:2060].to_frame().reset_index(drop=True), None),
             ('E19:E64', obj.oc.soln_pds_cumulative_operating_cost(
             ).loc[2015:2060].to_frame().reset_index(drop=True), None),
-            ('F19:F64', obj.oc.soln_pds_new_funits_per_year(
+            ('F19:F64', obj.oc._soln_pds_new_funits_per_year(
             ).loc[2015:, ['World']].reset_index(drop=True), None),
             # ('I19:I64', Not implemented
             # ('J19:J64', checked by 'Unit Adoption Calculations'!C253
@@ -923,27 +923,33 @@ def verify_operating_cost(obj, verify):
             # ('C69:C114', equal to K19:K64,
             ('D69:D114', obj.oc.marginal_annual_operating_cost(
             ).to_frame().reset_index(drop=True), None),
-            ('B126:B250', obj.oc.soln_marginal_first_cost(
+            ('B126:B250', obj.oc._soln_marginal_first_cost(
             ).to_frame().reset_index(drop=True), None),
             ('C126:C250', obj.oc.soln_marginal_operating_cost_savings(
             ).to_frame().reset_index(drop=True), None),
-            ('D126:D250', obj.oc.soln_net_cash_flow(
+            ('D126:D250', obj.oc._soln_net_cash_flow(
             ).to_frame().reset_index(drop=True), None),
             ('E126:E250', obj.oc.soln_net_present_value(
             ).to_frame().reset_index(drop=True), None),
-            ('I126:I250', obj.oc.soln_vs_conv_single_iunit_cashflow(
+            ('I126:I250', obj.oc._soln_vs_conv_single_iunit_cashflow(
             ).to_frame().reset_index(drop=True), None),
-            ('J126:J250', obj.oc.soln_vs_conv_single_iunit_npv(
+            ('J126:J250', obj.oc._soln_vs_conv_single_iunit_npv(
             ).to_frame().reset_index(drop=True), None),
             #('K126:K250', obj.oc.soln_vs_conv_single_iunit_payback().to_frame().reset_index(drop=True), None),
             #('L126:L250', obj.oc.soln_vs_conv_single_iunit_payback_discounted().to_frame().reset_index(drop=True), None),
-            ('M126:M250', obj.oc.soln_only_single_iunit_cashflow(
+            ('M126:M250', obj.oc._soln_only_single_iunit_cashflow(
             ).to_frame().reset_index(drop=True), None),
-            ('N126:N250', obj.oc.soln_only_single_iunit_npv(
+            ('N126:N250', obj.oc._soln_only_single_iunit_npv(
             ).to_frame().reset_index(drop=True), None),
             #('O126:O250', obj.oc.soln_only_single_iunit_payback().to_frame().reset_index(drop=True), None),
             #('P126:P250', obj.oc.soln_only_single_iunit_payback_discounted().to_frame().reset_index(drop=True), None),
             ]
+    return verify
+
+
+def verify_net_profit_margin(obj, verify):
+    # Blocked on ingesting npm into objs.
+    verify['Net Profit Margin'] = []
     return verify
 
 
@@ -1157,6 +1163,7 @@ def LAND_solution_verify_list(obj, zip_f):
 
     verify_first_cost(obj, verify)
     verify_operating_cost(obj, verify)
+    verify_net_profit_margin(obj, verify)
     verify_co2_calcs(obj, verify, is_rrs=False, include_regional_data=False)
     verify_ch4_calcs_land(obj, verify)
     return verify

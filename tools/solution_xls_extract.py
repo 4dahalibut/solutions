@@ -1041,7 +1041,7 @@ def write_fc(f, wb):
 
 
 def write_oc(f, wb, is_land=False):
-    """Code generate the Operating Code module for this solution class."""
+    """Code generate the Operating Cost module for this solution class."""
     oc_tab = wb.sheet_by_name('Operating Cost')
     f.write("        self.oc = operatingcost.OperatingCost(ac=self.ac,\n")
     f.write("            soln_net_annual_funits_adopted=soln_net_annual_funits_adopted,\n")
