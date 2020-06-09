@@ -41,6 +41,8 @@ class NetProfitMargin:
                  sol_trans_pd_pct=1,
                  conv_trans_pd_pct=1,
                  converting_factor=1,
+                 sol_heteroscedasticity=False,
+                 conv_heteroscedasticity=False,
                  ):
 
         self.ac = ac
@@ -58,9 +60,12 @@ class NetProfitMargin:
         self.converting_factor = converting_factor
         self.conversion_factor_vom = converting_factor
         self.conversion_factor_fom = converting_factor
-
+        self.sol_heteroscedasticity = sol_heteroscedasticity
+        self.conv_heteroscedasticity = conv_heteroscedasticity
 
         self.index = pd.RangeIndex(self.FIRST_YEAR, self.LAST_YEAR + 1)
+
+        self.sol_npm_per_land_unit = self.ac.soln_net_profit_margin_per_iunit
 
     def pds_npm_calc(self):
         """
@@ -74,7 +79,7 @@ class NetProfitMargin:
         for conversions/calculations, etc.
         """
         num_years = len(self.index)
-        npm_per_land_unit = pd.Series([self.ac.soln_net_profit_margin_per_iunit * self.converting_factor] * num_years)
+        npm_per_land_unit = pd.Series([self.sol_npm_per_land_unit * self.converting_factor] * num_years)
         net_annual_land_units_adopted = self.ua.net_annual_land_units_adopted().loc[
                                         self.FIRST_YEAR:self.LAST_YEAR].World
 
@@ -100,22 +105,45 @@ class NetProfitMargin:
         end_year = self.ac.report_end_year
         disturbance_rate = self.ac.disturbance_rate
         lifetime_savings_years = self.ac.soln_expected_lifetime
-        initial_installation_year = pd.Series(self.index)
+        initial_installation_year = pd.Series(self.index).values
+
 
         # Number of implementation Unit Lifetimes To End of Life =MAX(R258C1-R[4]C,0)/R258C3
-        num_iul_to_eol = (end_year - initial_installation_year).clip(lower=0) / lifetime_savings_years
+        num_iul_to_eol = np.maximum(end_year - initial_installation_year, 0) / lifetime_savings_years
 
         # Number of Implementation Unit Lifetimes to Analysis Period =IF(R259C>R258C1,10^3,0)
-        num_iul_to_analysis_pd = initial_installation_year.apply(lambda year: 1000 if year > end_year else 0)
+        num_iul_to_analysis_pd = np.where(initial_installation_year > end_year, 1000, 0)
 
         # Years of Life Left at End of Period =IF(R258C3*((ROUNDUP(R[-2]C,0)-R[-2]C))=0,R258C3,(R258C3*((ROUNDUP(R[-2]C,0)-R[-2]C))))
         intermediate = lifetime_savings_years * (np.ceil(num_iul_to_eol) - num_iul_to_eol)
-        years_of_life_at_end_of_pd = intermediate.apply(lambda x: lifetime_savings_years if x == 0 else x)
+        years_of_life_at_end_of_pd = np.where(intermediate == 0, lifetime_savings_years, intermediate)
 
         # Annual Functional Units Adopted (Net) =TRANSPOSE(R[-241]C[3]:R[-196]C[3])
         net_annual_land_units_adopted = self.ua.net_annual_land_units_adopted().loc[
                                         self.FIRST_YEAR:self.LAST_YEAR].World
-        self._annual_breakout()
+        net_annual_land_units_per_yr = np.insert(np.diff(net_annual_land_units_adopted), 0, [net_annual_land_units_adopted.values[0]])
+
+        cost_at_year = np.array([np.arange(self.FIRST_YEAR, self.LAST_YEAR_BIG)]).T
+
+        # Years since start of study or something, R1C262-...
+        # =IF(RC[1]<='Advanced Controls'!R4C8,0,RC[1]-'Advanced Controls'!R4C8)
+        years_since_start = np.where(cost_at_year <= start_year, 0, cost_at_year - start_year)
+
+        cond1 = np.hstack([cost_at_year] * len(self.index)) >= initial_installation_year + np.vstack([num_iul_to_analysis_pd] * len(cost_at_year)) * lifetime_savings_years
+        cond2 = years_since_start < (end_year - start_year) + years_of_life_at_end_of_pd
+
+        # Verified
+        someotherstuff = np.where(self.sol_trans_pd_type == self.TransitionPeriodType.LINEAR, (cost_at_year - initial_installation_year) /  self.sol_trans_pd_len * self.sol_npm_per_land_unit, self.sol_npm_per_land_unit * self.sol_trans_pd_pct)
+        no_hetero = np.where(cost_at_year >= initial_installation_year + self.sol_trans_pd_len, self.sol_npm_per_land_unit, someotherstuff)
+
+        part2 = self.converting_factor * net_annual_land_units_per_yr * np.where(self.sol_heteroscedasticity is False,
+                                                                                  no_hetero,
+                                                                                  np.nan)
+        first_part = np.where(cond1, np.where(cond2, part2, 0), 0)
+        cost_after_report_end = np.where(cost_at_year > end_year + years_of_life_at_end_of_pd - 1, years_of_life_at_end_of_pd % 1, 1)
+        nondisturbance_rate = 1 - disturbance_rate
+        lifetime_cost = first_part * cost_after_report_end * nondisturbance_rate
+        print(lifetime_cost)
 
     def _annual_breakout(self):
         #  Here starts the real function
@@ -123,9 +151,9 @@ class NetProfitMargin:
         # * RC2 is initial_installation_year
         """
             =IF(
-                RC2 >= R259C + R256C * R258C3,
+                RC2 >= R259C + R256C * R258C3, #COND1
                 IF(
-                    RC1 < ( ( R258C1 - R256C1 ) + R257C ),
+                    RC1 < ( ( R258C1 - R256C1 ) + R257C ), #COND2
                     R11C7 * ( R260C *
                         IF(
                             R531C2 = "N",
@@ -153,9 +181,6 @@ class NetProfitMargin:
             ) *
             IF(
                 RC2 > R258C1 + R257C - 1,
-
-                # TODO taking the mod of a float which is very close to 0 and 1 is almost definitely a bug,
-                # Because its going to be either almost 1 or almost 0 based on how the floating point error is
                 MOD(
                     R257C,
                     1
@@ -163,14 +188,16 @@ class NetProfitMargin:
                 1
             ) * ( 1 - R260C1 )
         """
-        breakout = pd.DataFrame(0, index=np.arange(self.FIRST_YEAR, self.LAST_YEAR_BIG + 1),
-                                columns=np.arange(self.FIRST_YEAR, self.LAST_YEAR + 1), dtype='float')
 
-        first_part = None
-        # if initial_installation_year >= N
-        second_part = (years_of_life_at_end_of_pd
-                       if initial_installation_year > end_year + years_of_life_at_end_of_pd - 1
-                       else 1)
-
-        lifetime_cost = first_part * second_part
-
+        #
+        # breakout = pd.DataFrame(0, index=np.arange(self.FIRST_YEAR, self.LAST_YEAR_BIG + 1),
+        #                         columns=np.arange(self.FIRST_YEAR, self.LAST_YEAR + 1), dtype='float')
+        #
+        # first_part = None
+        # # if initial_installation_year >= N
+        # second_part = (years_of_life_at_end_of_pd
+        #                if initial_installation_year > end_year + years_of_life_at_end_of_pd - 1
+        #                else 1)
+        #
+        # lifetime_cost = first_part * second_part
+        #
